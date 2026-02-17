@@ -17,7 +17,7 @@ setup(
         # Include URDF files
         (os.path.join('share', package_name, 'model'), glob('model/*.xacro')),
         # Include Config files
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'config'), glob('config/*')),        
         #Include World files
         (os.path.join('share', package_name, 'worlds'), glob('worlds/*.sdf')),
 

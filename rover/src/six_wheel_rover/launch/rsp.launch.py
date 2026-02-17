@@ -10,19 +10,16 @@ from launch_ros.actions import Node
 def generate_launch_description():
     package_name = 'six_wheel_rover'
 
-    # Paths
     pkg_share = get_package_share_directory(package_name)
     
-    # 1. Update Xacro Path to the file with the Camera
     xacro_file = os.path.join(pkg_share, 'model', 'six_wheel_rover_camera.xacro')
 
-    # 2. Update World Path to your custom SDF
-    # Ensure you added 'world.sdf' to the 'worlds' folder in your package install
     world_file = os.path.join(pkg_share, 'worlds', 'rover_world.sdf')
+
+    rviz_config_file = os.path.join(pkg_share, 'config', 'six_wheel_rover.rviz')
 
     robot_description_config = xacro.process_file(xacro_file).toxml()
 
-    # Node: Robot State Publisher
     rsp = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -30,16 +27,13 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_description_config, 'use_sim_time': True}]
     )
 
-    # Node: Gazebo Harmonic (gz_sim)
-    # Loading the specific world file
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
             get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')]),
         launch_arguments={'gz_args': f'-r {world_file}'}.items(),
     )
 
-    # Node: Spawn Entity
-    spawn_entity = Node(
+    rover = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
@@ -49,23 +43,21 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Node: ROS GZ Bridge
-    # Added Camera topics mappings
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=[
-            # Existing mappings
             '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
             '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
             '/camera/image_raw@sensor_msgs/msg/Image@gz.msgs.Image',
             '/camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo'
+            '/camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
+            '/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
         ],
         output='screen'
     )
 
-    # Node: Controller Spawners
     load_joint_broadcaster = Node(
         package="controller_manager",
         executable="spawner",
@@ -78,7 +70,6 @@ def generate_launch_description():
         arguments=["velocity_controller"],
     )
 
-    # Node: Teleop Keyboard
     teleop = Node(
         package='six_wheel_rover',
         executable='teleop',
@@ -87,7 +78,6 @@ def generate_launch_description():
         prefix='gnome-terminal --' 
     )   
 
-    # Node: Custom Controller (if applicable)
     controller = Node(
         package='six_wheel_rover',
         executable='controller',
@@ -95,16 +85,25 @@ def generate_launch_description():
         output='screen',
     )   
 
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', rviz_config_file]
+    )
+
     return LaunchDescription([
         rsp,
         gazebo,
-        spawn_entity,
+        rover,
         bridge,
-        teleop,
+        # teleop, #Uncomment to use teleop 
         controller,
+        rviz,
         RegisterEventHandler(
             event_handler=OnProcessExit(
-                target_action=spawn_entity,
+                target_action=rover,
                 on_exit=[load_joint_broadcaster, load_diff_drive_controller],
             )
         )
