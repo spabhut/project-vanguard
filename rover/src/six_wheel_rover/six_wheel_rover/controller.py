@@ -36,52 +36,12 @@ class SixWheelRoverController(Node):
         else:
             q_dot = self.current_cmd
 
-        # === 3. Implement Kinematics ===
-        # Rows: [vx contribution, vy contribution, omega contribution]
-        S_mid = np.array([
-            [self.r/2,           self.r/2],          # vx
-            [0,                  0],                 # vy
-            [self.r/(2*self.b), -self.r/(2*self.b)]  # omega
-        ])
-
-        # S_front (distance = d)
-        # From image: Row 2 is (r/2b)*(b*sin + d*cos) -> (r/2b)*d when phi=0
-        S_front = np.array([
-            [self.r/2,              self.r/2],             # vx
-            [(self.r*self.d)/(2*self.b), -(self.r*self.d)/(2*self.b)], # vy (Lateral slip term)
-            [self.r/(2*self.b),    -self.r/(2*self.b)]     # omega
-        ])
-
-        # S_rear (distance = -d)
-        # Same as front but d becomes -d
-        S_rear = np.array([
-            [self.r/2,              self.r/2],             # vx
-            [-(self.r*self.d)/(2*self.b), (self.r*self.d)/(2*self.b)],  # vy
-            [self.r/(2*self.b),    -self.r/(2*self.b)]     # omega
-        ])
-
-        # INVERT: wheel_vel = pinv(S_total) * q_dot
-        # We use Pseudo-Inverse because the matrix is not square (3x2)
-        S_inv_mid = np.linalg.pinv(S_mid)
-        S_inv_front = np.linalg.pinv(S_front)
-        S_inv_rear = np.linalg.pinv(S_rear)
-
-        wheel_speeds_mid = S_inv_mid @ q_dot
-        wheel_speeds_front = S_inv_front @ q_dot
-        wheel_speeds_rear = S_inv_rear @ q_dot
-        
-        wLm = wheel_speeds_mid[0]
-        wRm = wheel_speeds_mid[1]
-
-        wLf = wheel_speeds_front[0]
-        wRf = wheel_speeds_front[1]
-
-        wLr = wheel_speeds_rear[0]
-        wRr = wheel_speeds_rear[1]
+        wL = (q_dot[0] - (q_dot[2]*self.b)/2)/self.r
+        wR = (q_dot[0] + (q_dot[2]*self.b)/2)/self.r
 
         # Publish to all 6 wheels
         cmd = Float64MultiArray()
-        cmd.data = [wLf, wLm, wLr, wRf, wRm, wRr]
+        cmd.data = [wL, wL, wL, wR, wR, wR]
         self.pub.publish(cmd)
 
 def main(args=None):
